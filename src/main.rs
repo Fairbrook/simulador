@@ -3,13 +3,13 @@ mod types;
 mod ui;
 // use questionary;
 
-fn process_to_batch(processes: Vec<types::process::Process>) -> Vec<types::Batch> {
-    let mut res: Vec<types::Batch> = Vec::new();
-    let mut batch = types::Batch::new();
+fn process_to_batch(processes: Vec<types::process::Process>) -> Vec<types::process::Batch> {
+    let mut res: Vec<types::process::Batch> = Vec::new();
+    let mut batch = types::process::Batch::new();
     for p in processes {
         if batch.add_process(p) >= 4 {
             res.push(batch);
-            batch = types::Batch::new();
+            batch = types::process::Batch::new();
         }
     }
     res.push(batch);
@@ -80,7 +80,7 @@ fn main() {
     //         pid: String::from("proc 6"),
     //     },
     // ];
-    if list.len()==0{
+    if list.len() == 0 {
         println!("Cancelado por el usuario");
         return;
     }

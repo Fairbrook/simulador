@@ -97,7 +97,7 @@ pub fn operator() -> process::Operators {
 
 pub fn confirm() -> bool {
     let ans = Confirm::new("¿Comenzar a ejecutar los procesos? ")
-        .with_default(false)
+        .with_default(true)
         .prompt();
     match ans {
         Ok(val) => val,

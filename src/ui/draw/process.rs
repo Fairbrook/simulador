@@ -1,4 +1,8 @@
-use crate::types;
+use crate::types::{
+    global::State,
+    process::{Batch, Process},
+    seconds_to_str,
+};
 use std::io;
 use tui::{
     backend::CrosstermBackend,
@@ -24,7 +28,7 @@ fn get_layout(size: Rect) -> Vec<Rect> {
 fn batch_list(
     f: &mut Frame<CrosstermBackend<io::Stdout>>,
     size: Rect,
-    batches: &[types::Batch],
+    batches: &[Batch],
     active_index: usize,
 ) {
     let batches_len = if batches.len() > 0 {
@@ -78,7 +82,7 @@ fn batch_list(
 fn active_batch(
     f: &mut Frame<CrosstermBackend<io::Stdout>>,
     rect: Rect,
-    batch: &types::Batch,
+    batch: &Batch,
     index: usize,
 ) {
     let block = Block::default()
@@ -91,11 +95,11 @@ fn active_batch(
     let mut process_list: Vec<Spans> = batch
         .get_processes()
         .iter()
-        .map(|p| Spans::from(String::from("#") + &p.pid[..] + ": " + &types::seconds_to_str(p.et)))
+        .map(|p| Spans::from(String::from("#") + &p.pid[..] + ": " + &seconds_to_str(p.et)))
         .collect();
     let mut text = vec![Spans::from(vec![
         Span::from("Tiempo estimado: "),
-        Span::from(types::seconds_to_str(batch.estimated())),
+        Span::from(seconds_to_str(batch.estimated())),
     ])];
     text.append(&mut process_list);
     f.render_widget(Paragraph::new(text).block(block), rect);
@@ -104,7 +108,7 @@ fn active_batch(
 fn active_process(
     f: &mut Frame<CrosstermBackend<io::Stdout>>,
     rect: Rect,
-    process: &types::process::Process,
+    process: &Process,
     elapsed: u32,
 ) {
     let info = Layout::default()
@@ -147,7 +151,7 @@ fn active_process(
         ]),
         Spans::from(vec![
             Span::from("Tiempo máximo: "),
-            Span::from(types::seconds_to_str(process.et)),
+            Span::from(seconds_to_str(process.et)),
         ]),
     ];
     let safe_elapsed = if elapsed > process.et {
@@ -169,14 +173,14 @@ fn active_process(
     f.render_widget(
         Paragraph::new(Spans::from(vec![
             Span::from("T: "),
-            Span::from(types::seconds_to_str(safe_elapsed)),
+            Span::from(seconds_to_str(safe_elapsed)),
         ])),
         times[0],
     );
     f.render_widget(
         Paragraph::new(Spans::from(vec![
             Span::from("Restante: "),
-            Span::from(types::seconds_to_str(process.et - safe_elapsed)),
+            Span::from(seconds_to_str(process.et - safe_elapsed)),
         ]))
         .alignment(Alignment::Right),
         times[1],
@@ -184,12 +188,7 @@ fn active_process(
     f.render_widget(gauge, info[2]);
 }
 
-fn active(
-    f: &mut Frame<CrosstermBackend<io::Stdout>>,
-    size: Rect,
-    batch: &types::Batch,
-    index: usize,
-) {
+fn active(f: &mut Frame<CrosstermBackend<io::Stdout>>, size: Rect, batch: &Batch, index: usize) {
     let layout = Layout::default()
         .margin(0)
         .direction(Direction::Vertical)
@@ -199,7 +198,7 @@ fn active(
     active_process(f, layout[1], batch.get_active(), batch.delta());
 }
 
-fn finished_proc(text: &mut Vec<Spans>, proc: &types::process::Process) {
+fn finished_proc(text: &mut Vec<Spans>, proc: &Process) {
     text.push(Spans::from(vec![
         Span::styled("#", Style::default().add_modifier(Modifier::UNDERLINED)),
         Span::styled(
@@ -218,8 +217,8 @@ fn finished_proc(text: &mut Vec<Spans>, proc: &types::process::Process) {
 fn finished(
     f: &mut Frame<CrosstermBackend<io::Stdout>>,
     size: Rect,
-    batch: &types::Batch,
-    batches: &[types::Batch],
+    batch: &Batch,
+    batches: &[Batch],
 ) {
     let block = Block::default()
         .title("Procesos terminados")
@@ -237,7 +236,7 @@ fn finished(
     f.render_widget(Paragraph::new(text).block(block), size);
 }
 
-pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, rect: Rect, state: &types::GobalState) {
+pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, rect: Rect, state: &State) {
     let layout = get_layout(rect);
     batch_list(f, layout[0], state.get_queued(), state.active_index());
     active(f, layout[1], state.get_active(), state.active_index());

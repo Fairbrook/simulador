@@ -1,7 +1,7 @@
 mod footer;
 mod header;
 mod process;
-use crate::types;
+use crate::types::global;
 use crossterm::terminal::enable_raw_mode;
 use std::io;
 use tui::{
@@ -32,7 +32,7 @@ fn get_layout(rect: Rect) -> Vec<Rect> {
         .split(rect)
 }
 
-pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, state: &types::GobalState) {
+pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, state: &global::State) {
     let layout = get_layout(f.size());
     header::render(f, layout[0]);
     process::render(f, layout[1], state);
