@@ -42,5 +42,6 @@ pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, state: &global::State
         state.estimated(),
         state.elapsed(),
         state.get_processes_len(),
+        state.status(),
     );
 }

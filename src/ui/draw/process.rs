@@ -1,6 +1,6 @@
 use crate::types::{
     global::State,
-    process::{Batch, Process},
+    process::{Batch, StatefulProcess},
     seconds_to_str,
 };
 use std::io;
@@ -25,58 +25,15 @@ fn get_layout(size: Rect) -> Vec<Rect> {
         .split(size)
 }
 
-fn batch_list(
-    f: &mut Frame<CrosstermBackend<io::Stdout>>,
-    size: Rect,
-    batches: &[Batch],
-    active_index: usize,
-) {
-    let batches_len = if batches.len() > 0 {
-        batches.len() - 1
-    } else {
-        0
-    };
-    let block = Block::default()
-        .title(Spans::from(vec![
-            Span::from(" Lotes restantes: "),
-            Span::from(batches_len.to_string()),
-            Span::from(" "),
-        ]))
-        .borders(Borders::ALL);
-
-    let mut text = vec![Spans::from("")];
-    for (index, batch) in batches.iter().enumerate() {
-        let is_active = index == 0;
-        let queued = batch.get_queued(is_active);
-        if queued.len() == 0 {
-            continue;
-        }
-        if is_active {
-            continue;
-        }
-
-        text.push(Spans::from(vec![Span::styled(
-            String::from("Lote #")
-                + &(index + active_index).to_string()
-                + if is_active { " (Activo)" } else { "" },
-            Style::default()
-                .fg(if is_active {
-                    Color::LightBlue
-                } else {
-                    Color::DarkGray
-                })
-                .add_modifier(Modifier::UNDERLINED),
-        )]));
-        for p in queued {
-            text.push(Spans::from(vec![
-                Span::from("  • "),
-                Span::from(&p.pid[..]),
-            ]));
-        }
-        text.push(Spans::from(""));
-    }
-    let text = Paragraph::new(text).block(block);
-    f.render_widget(text, size);
+fn queued_batch_number(f: &mut Frame<CrosstermBackend<io::Stdout>>, size: Rect, len: u32) {
+    let block = Block::default().title("").borders(Borders::ALL);
+    let paragraph = Paragraph::new(Spans::from(vec![
+        Span::from(" Lotes restantes: "),
+        Span::from(len.to_string()),
+        Span::from(" "),
+    ]))
+    .block(block);
+    f.render_widget(paragraph, size);
 }
 
 fn active_batch(
@@ -88,28 +45,33 @@ fn active_batch(
     let block = Block::default()
         .title(Spans::from(vec![
             Span::from(" Lote en ejecución #"),
-            Span::from(index.to_string()),
+            Span::from((index + 1).to_string()),
             Span::from(" "),
         ]))
         .borders(Borders::ALL);
-    let mut process_list: Vec<Spans> = batch
-        .get_processes()
-        .iter()
-        .map(|p| Spans::from(String::from("#") + &p.pid[..] + ": " + &seconds_to_str(p.et)))
-        .collect();
-    let mut text = vec![Spans::from(vec![
-        Span::from("Tiempo estimado: "),
-        Span::from(seconds_to_str(batch.estimated())),
-    ])];
-    text.append(&mut process_list);
+    let mut text = vec![Spans::from(vec![Span::styled(
+        "Procesos en cola: ",
+        Style::default().fg(Color::DarkGray),
+    )])];
+    for stateful in batch.get_queued(true) {
+        text.push(Spans::from(Span::styled(
+            String::from("PID: ") + &stateful.process.pid,
+            Style::default().add_modifier(Modifier::BOLD),
+        )));
+        text.push(Spans::from(
+            String::from(" Estimado: ") + &stateful.process.et.to_string(),
+        ));
+        text.push(Spans::from(
+            String::from(" Restante: ") + &(stateful.process.et - stateful.elapsed).to_string(),
+        ));
+    }
     f.render_widget(Paragraph::new(text).block(block), rect);
 }
 
 fn active_process(
     f: &mut Frame<CrosstermBackend<io::Stdout>>,
     rect: Rect,
-    process: &Process,
-    elapsed: u32,
+    stateful_process: &StatefulProcess,
 ) {
     let info = Layout::default()
         .margin(0)
@@ -131,7 +93,10 @@ fn active_process(
     let block = Block::default()
         .title(Spans::from(vec![
             Span::styled(" Proceso en ejecución: ", Style::default().fg(Color::Green)),
-            Span::styled(&process.pid[..], Style::default().fg(Color::Green)),
+            Span::styled(
+                &stateful_process.process.pid[..],
+                Style::default().fg(Color::Green),
+            ),
             Span::from(" "),
         ]))
         .borders(Borders::ALL);
@@ -139,37 +104,49 @@ fn active_process(
         Spans::from(""),
         Spans::from(vec![
             Span::from("Número de programa: "),
-            Span::from(&process.pid[..]),
-        ]),
-        Spans::from(vec![
-            Span::from("Programador: "),
-            Span::from(&process.owner[..]),
+            Span::from(&stateful_process.process.pid[..]),
         ]),
         Spans::from(vec![
             Span::from("Operacion: "),
-            Span::from(process.operation.to_string()),
+            Span::from(stateful_process.process.operation.to_string()),
         ]),
         Spans::from(vec![
             Span::from("Tiempo máximo: "),
-            Span::from(seconds_to_str(process.et)),
+            Span::from(seconds_to_str(stateful_process.process.et)),
         ]),
     ];
-    let safe_elapsed = if elapsed > process.et {
-        process.et
+    let safe_elapsed = if stateful_process.elapsed > stateful_process.process.et {
+        stateful_process.process.et
     } else {
-        elapsed
+        stateful_process.elapsed
     };
-    let percent: u16 = ((safe_elapsed as f64 / process.et as f64) * 100.0) as u16;
-    let gauge = Gauge::default()
-        .gauge_style(
-            Style::default()
-                .fg(Color::Green)
-                .bg(Color::Gray)
-                .add_modifier(Modifier::ITALIC),
-        )
-        .percent(if percent > 100 { 100 } else { percent });
     f.render_widget(block, rect);
     f.render_widget(Paragraph::new(text), info[0]);
+    if stateful_process.error {
+        f.render_widget(
+            Paragraph::new(Spans::from(Span::styled(
+                "ERROR",
+                Style::default().fg(Color::LightRed),
+            ))),
+            info[2],
+        );
+        return;
+    }
+    if stateful_process.finished {
+        f.render_widget(
+            Paragraph::new(vec![
+                Spans::from("Operación: "),
+                Spans::from(Span::styled(
+                    stateful_process.process.operation.to_string()
+                        + " = "
+                        + &stateful_process.result.to_string(),
+                    Style::default().fg(Color::LightBlue),
+                )),
+            ]),
+            info[1],
+        );
+        return;
+    }
     f.render_widget(
         Paragraph::new(Spans::from(vec![
             Span::from("T: "),
@@ -180,65 +157,86 @@ fn active_process(
     f.render_widget(
         Paragraph::new(Spans::from(vec![
             Span::from("Restante: "),
-            Span::from(seconds_to_str(process.et - safe_elapsed)),
+            Span::from(seconds_to_str(stateful_process.process.et - safe_elapsed)),
         ]))
         .alignment(Alignment::Right),
         times[1],
     );
+    let percent: u16 = ((safe_elapsed as f64 / stateful_process.process.et as f64) * 100.0) as u16;
+    let gauge = Gauge::default()
+        .gauge_style(
+            Style::default()
+                .fg(Color::Green)
+                .bg(Color::Gray)
+                .add_modifier(Modifier::ITALIC),
+        )
+        .percent(if percent > 100 { 100 } else { percent });
     f.render_widget(gauge, info[2]);
 }
 
-fn active(f: &mut Frame<CrosstermBackend<io::Stdout>>, size: Rect, batch: &Batch, index: usize) {
+fn active(f: &mut Frame<CrosstermBackend<io::Stdout>>, size: Rect, state: &State) {
     let layout = Layout::default()
         .margin(0)
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Min(3), Constraint::Ratio(1, 1)])
         .split(size);
-    active_batch(f, layout[0], batch, index);
-    active_process(f, layout[1], batch.get_active(), batch.delta());
+    let batch = state.get_active();
+    let queued_batch = state.len() - state.active_index() as u32 - 1;
+    queued_batch_number(f, layout[0], queued_batch);
+    active_process(f, layout[1], batch.get_active());
 }
 
-fn finished_proc(text: &mut Vec<Spans>, proc: &Process) {
+fn finished_proc(text: &mut Vec<Spans>, stateful_process: &StatefulProcess) {
     text.push(Spans::from(vec![
-        Span::styled("#", Style::default().add_modifier(Modifier::UNDERLINED)),
+        Span::styled("PID: ", Style::default().add_modifier(Modifier::BOLD)),
         Span::styled(
-            proc.pid.clone(),
-            Style::default().add_modifier(Modifier::UNDERLINED),
+            stateful_process.process.pid.clone(),
+            Style::default().add_modifier(Modifier::BOLD),
         ),
     ]));
+    if stateful_process.error {
+        text.push(Spans::from(vec![Span::styled(
+            " ERROR",
+            Style::default().fg(Color::LightRed),
+        )]));
+        return;
+    }
     text.push(Spans::from(vec![
         Span::from(" Operacion: "),
-        Span::from(proc.operation.to_string()),
+        Span::from(stateful_process.process.operation.to_string()),
         Span::from(" = "),
-        Span::from(proc.operation.calc().to_string()),
+        Span::from(stateful_process.result.to_string()),
     ]));
 }
 
-fn finished(
-    f: &mut Frame<CrosstermBackend<io::Stdout>>,
-    size: Rect,
-    batch: &Batch,
-    batches: &[Batch],
-) {
+fn finished(f: &mut Frame<CrosstermBackend<io::Stdout>>, size: Rect, batches: &[Batch]) {
     let block = Block::default()
         .title("Procesos terminados")
         .borders(Borders::ALL);
     let mut text = Vec::new();
-    for b in batches {
-        for p in b.get_processes() {
-            finished_proc(&mut text, p)
+    for (i, b) in batches.iter().enumerate() {
+        let list = b.get_finished();
+        if list.len() == 0 {
+            continue;
+        }
+        text.push(Spans::from(vec![Span::styled(
+            String::from("Lote: ") + &(i + 1).to_string(),
+            Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::UNDERLINED),
+        )]));
+        for p in list {
+            finished_proc(&mut text, &p)
         }
         text.push(Spans::from(""));
-    }
-    for p in batch.get_finished() {
-        finished_proc(&mut text, p);
     }
     f.render_widget(Paragraph::new(text).block(block), size);
 }
 
 pub fn render(f: &mut Frame<CrosstermBackend<io::Stdout>>, rect: Rect, state: &State) {
     let layout = get_layout(rect);
-    batch_list(f, layout[0], state.get_queued(), state.active_index());
-    active(f, layout[1], state.get_active(), state.active_index());
-    finished(f, layout[2], state.get_active(), state.get_finished());
+    active_batch(f, layout[0], state.get_active(), state.active_index());
+    // batch_list(f, layout[0], state.get_queued(), state.active_index());
+    active(f, layout[1], state);
+    finished(f, layout[2], state.get_batches());
 }

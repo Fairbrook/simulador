@@ -36,9 +36,11 @@ fn quit_label(f: &mut Frame<CrosstermBackend<io::Stdout>>, rect: Rect) {
     let block = Block::default().borders(Borders::NONE);
     let text = Spans::from(vec![
         Span::styled("Presione ", Style::default().fg(Color::DarkGray)),
-        Span::styled("q", Style::default().fg(Color::LightBlue)),
-        Span::styled(" para ", Style::default().fg(Color::DarkGray)),
-        Span::styled("salir", Style::default().fg(Color::LightBlue)),
+        Span::styled(" q salir", Style::default().fg(Color::LightBlue)),
+        Span::styled("  p pausa", Style::default().fg(Color::LightMagenta)),
+        Span::styled("  c continuar", Style::default().fg(Color::Green)),
+        Span::styled("  i int", Style::default().fg(Color::LightCyan)),
+        Span::styled("  e err", Style::default().fg(Color::LightRed)),
     ]);
     f.render_widget(
         Paragraph::new(text)

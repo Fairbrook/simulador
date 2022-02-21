@@ -1,6 +1,9 @@
 mod draw;
 mod events;
-use crate::types::{global::State, process::Batch};
+use crate::types::{
+    global::{State, States},
+    process::Batch,
+};
 use crossterm::{event::KeyCode, terminal::disable_raw_mode};
 use std::time::{Duration, Instant};
 
@@ -16,8 +19,10 @@ pub fn start(batches: Vec<Batch>) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         terminal.draw(|f| {
             if last_tick.elapsed() >= tick_rate {
-                last_tick = Instant::now();
-                state.add_seg();
+                if States::Paused != *state.status() {
+                    last_tick = Instant::now();
+                    state.add_seg();
+                }
             }
             draw::render(f, &state);
         })?;
@@ -27,6 +32,18 @@ pub fn start(batches: Vec<Batch>) -> Result<(), Box<dyn std::error::Error>> {
                     disable_raw_mode()?;
                     terminal.show_cursor()?;
                     break;
+                }
+                KeyCode::Char('p') => {
+                    state.pause();
+                }
+                KeyCode::Char('c') => {
+                    state.play();
+                }
+                KeyCode::Char('i')=>{
+                    state.interrupt();
+                }
+                KeyCode::Char('e')=>{
+                    state.error();
                 }
                 _ => {}
             },
