@@ -1,55 +1,16 @@
-mod draw;
-mod events;
 use crate::types::{
     global::{State, States},
     process::Batch,
 };
-use crossterm::{event::KeyCode, terminal::disable_raw_mode};
+mod windows;
+use nwd::NwgUi;
+use nwg::NativeUi;
 use std::time::{Duration, Instant};
+extern crate native_windows_gui as nwg;
 
 pub fn start(batches: Vec<Batch>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut state = State::new();
-    for batch in batches {
-        state.add_batch(batch);
-    }
-    let (_, rx) = events::spawn_event_thread();
-    let mut terminal = draw::init_terminal()?;
-    let tick_rate = Duration::from_millis(1000);
-    let mut last_tick = Instant::now();
-    loop {
-        terminal.draw(|f| {
-            if last_tick.elapsed() >= tick_rate {
-                if States::Paused != *state.status() {
-                    last_tick = Instant::now();
-                    state.add_seg();
-                }
-            }
-            draw::render(f, &state);
-        })?;
-        match rx.recv()? {
-            events::Event::Input(event) => match event.code {
-                KeyCode::Char('q') => {
-                    disable_raw_mode()?;
-                    terminal.show_cursor()?;
-                    break;
-                }
-                KeyCode::Char('p') => {
-                    state.pause();
-                }
-                KeyCode::Char('c') => {
-                    state.play();
-                }
-                KeyCode::Char('i')=>{
-                    state.interrupt();
-                }
-                KeyCode::Char('e')=>{
-                    state.error();
-                }
-                _ => {}
-            },
-            events::Event::Tick => {}
-        }
-    }
-
+    nwg::init().expect("Fallo la inicialización");
+    let _app = windows::Main::build_ui(Default::default()).expect("Fallo al construir el ui");
+    nwg::dispatch_thread_events();
     Ok(())
 }
