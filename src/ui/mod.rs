@@ -1,11 +1,5 @@
-use crate::types::{
-    global::{State, States},
-    process::Batch,
-};
 mod windows;
-use nwd::NwgUi;
 use nwg::NativeUi;
-use std::time::{Duration, Instant};
 extern crate native_windows_gui as nwg;
 
 pub fn start() -> Result<(), Box<dyn std::error::Error>> {

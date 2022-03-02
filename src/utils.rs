@@ -1,21 +1,5 @@
 use crate::types;
-use crate::PROCESS_PER_BATCH;
 use rand::prelude::*;
-
-pub fn process_to_batch(processes: Vec<types::process::Process>) -> Vec<types::process::Batch> {
-    let mut res: Vec<types::process::Batch> = Vec::new();
-    let mut batch = types::process::Batch::new();
-    for p in processes {
-        if batch.add_process(p) >= PROCESS_PER_BATCH {
-            res.push(batch);
-            batch = types::process::Batch::new();
-        }
-    }
-    if batch.len() > 0 {
-        res.push(batch);
-    }
-    res
-}
 
 fn random_operator(rng: &mut ThreadRng) -> types::process::Operators {
     let rnd: u16 = rng.gen_range(0..5);
