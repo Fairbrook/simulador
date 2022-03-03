@@ -51,10 +51,7 @@ impl State {
         }
     }
     pub fn start(&mut self) {
-        self.processes[self.active].start();
-    }
-    pub fn len(&self) -> u32 {
-        self.len
+        self.processes[self.active].start(self.elapsed);
     }
     pub fn estimated(&self) -> u32 {
         self.et
@@ -68,7 +65,7 @@ impl State {
             self.status = States::Finished;
             return;
         }
-        self.processes[self.active].start();
+        self.processes[self.active].start(self.elapsed);
     }
     pub fn tick(&mut self) -> Vec<ShouldUpdate> {
         let mut updates = Vec::<ShouldUpdate>::new();
@@ -91,7 +88,7 @@ impl State {
                 updates.push(ShouldUpdate::Queue);
                 last_index = i as i32;
                 self.processes.push(proc.clone());
-                self.processes[self.active].start();
+                self.processes[self.active].start(self.elapsed);
             }
         }
         if last_index > -1 {
@@ -128,14 +125,8 @@ impl State {
     pub fn get_finished(&self) -> &[StatefulProcess] {
         &self.processes[..self.active]
     }
-    pub fn get_processes(&self) -> &[StatefulProcess] {
-        &self.processes[..]
-    }
     pub fn elapsed(&self) -> u32 {
         self.elapsed
-    }
-    pub fn active_index(&self) -> usize {
-        self.active
     }
     pub fn interrupt(&mut self) {
         let active = &mut self.processes[self.active];
@@ -143,7 +134,7 @@ impl State {
         self.blocked.push(active.clone());
         self.processes.remove(self.active);
         self.et += BLOCKED_SECONDS;
-        self.processes[self.active].start();
+        self.processes[self.active].start(self.elapsed);
     }
     pub fn error(&mut self) {
         if States::Finished == self.status {

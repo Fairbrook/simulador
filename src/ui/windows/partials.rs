@@ -18,7 +18,7 @@ pub struct ReadyQueue {
         ex_flags: nwg::ListViewExFlags::GRID | nwg::ListViewExFlags::FULL_ROW_SELECT, 
     )]  
     #[nwg_layout_item(layout: layout,size:Size{width: D::Auto, height: D::Percent(0.95)})]
-    data_view: nwg::ListView,
+    pub data_view: nwg::ListView,
 }
 
 impl ReadyQueue{
@@ -30,6 +30,7 @@ impl ReadyQueue{
         dv.set_headers_enabled(true);
     }
     pub fn set_list(&self, list: &Vec<StatefulProcess>){
+        self.label.set_text(&format!("Procesos en cola: {}",list.len()));
         let dv = &self.data_view;
         dv.clear();
 
@@ -52,7 +53,7 @@ pub struct BlockedQueue {
         ex_flags: nwg::ListViewExFlags::GRID | nwg::ListViewExFlags::FULL_ROW_SELECT, 
     )]  
     #[nwg_layout_item(layout: layout,size:Size{width: D::Auto, height: D::Percent(0.95)})]
-    data_view: nwg::ListView,
+    pub data_view: nwg::ListView,
 }
 
 impl BlockedQueue{
@@ -86,7 +87,7 @@ pub struct FinishedList {
         ex_flags: nwg::ListViewExFlags::GRID | nwg::ListViewExFlags::FULL_ROW_SELECT, 
     )]  
     #[nwg_layout_item(layout: layout,size:Size{width: D::Auto, height: D::Percent(0.95)})]
-    data_view: nwg::ListView,
+    pub data_view: nwg::ListView,
 }
 
 impl FinishedList{
@@ -118,37 +119,45 @@ pub struct Runing{
     #[nwg_layout(spacing: 2)]
     layout: nwg::GridLayout,
 
+    #[nwg_control(text:"Proceso en ejecución", h_align:nwg::HTextAlign::Left)]
+    #[nwg_layout_item(layout:layout,row:0,col:0, col_span:3)]
+    title: nwg::Label,
+
     #[nwg_control(text:"PID: ", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:0,col:0)]
+    #[nwg_layout_item(layout:layout,row:1,col:0)]
     pid_label: nwg::Label,
 
     #[nwg_control(text:"", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:0,col:1, col_span: 2)]
+    #[nwg_layout_item(layout:layout,row:1,col:1, col_span: 2)]
     pid: nwg::Label,
 
     #[nwg_control(text:"Operación: ", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:1,col:0)]
+    #[nwg_layout_item(layout:layout,row:2,col:0)]
     operation_label: nwg::Label,
 
     #[nwg_control(text:"00:00", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:1,col:1, col_span: 2)]
+    #[nwg_layout_item(layout:layout,row:2,col:1, col_span: 2)]
     operation: nwg::Label,
 
     #[nwg_control(text:"Transcurrido: ", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:2,col:0)]
+    #[nwg_layout_item(layout:layout,row:3,col:0)]
     elapsed_label: nwg::Label,
 
     #[nwg_control(text:"00:00", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:2,col:1, col_span: 2)]
+    #[nwg_layout_item(layout:layout,row:3,col:1, col_span: 2)]
     elapsed: nwg::Label,
 
     #[nwg_control(text:"Restante: ", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:3,col:0)]
+    #[nwg_layout_item(layout:layout,row:4,col:0)]
     remaning_label: nwg::Label,
 
     #[nwg_control(text:"00:00", h_align:nwg::HTextAlign::Left)]
-    #[nwg_layout_item(layout:layout,row:3,col:1, col_span: 2)]
+    #[nwg_layout_item(layout:layout,row:4,col:1, col_span: 2)]
     remaning: nwg::Label,
+
+    #[nwg_control(text: "")]
+    #[nwg_layout_item(layout:layout,row:5,col:1, row_span: 10)]
+    space: nwg::Label
 }
 
 impl Runing{

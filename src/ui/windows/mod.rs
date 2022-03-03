@@ -42,6 +42,18 @@ pub struct Main {
     #[nwg_layout_item(layout:layout,row:10,col:1)]
     global_timer: nwg::Label,
 
+    #[nwg_control(text:"Estimado: ", h_align:nwg::HTextAlign::Right)]
+    #[nwg_layout_item(layout:layout,row:10,col:2)]
+    et_label: nwg::Label,
+
+    #[nwg_control(text:"00:00", h_align:nwg::HTextAlign::Left)]
+    #[nwg_layout_item(layout:layout,row:10,col:3)]
+    et_timer: nwg::Label,
+
+    #[nwg_control(text:"", h_align:nwg::HTextAlign::Right)]
+    #[nwg_layout_item(layout:layout,row:10,col:4)]
+    state_label: nwg::Label,
+
     #[nwg_control(flags: "VISIBLE")]
     #[nwg_layout_item(layout: layout, row:0,  col: 0, col_span:3, row_span: 10)]
     queue_frame: nwg::Frame,
@@ -59,12 +71,15 @@ pub struct Main {
     ready_frame: nwg::Frame,
 
     #[nwg_partial(parent: queue_frame)]
+    #[nwg_events((data_view, OnKeyPress):[Main::on_key_press(SELF, EVT_DATA)] )]
     queue_ui: ReadyQueue,
 
     #[nwg_partial(parent: blocked_frame)]
+    #[nwg_events((data_view, OnKeyPress):[Main::on_key_press(SELF, EVT_DATA)] )]
     blocked_ui: BlockedQueue,
 
     #[nwg_partial(parent: ready_frame)]
+    #[nwg_events((data_view, OnKeyPress):[Main::on_key_press(SELF, EVT_DATA)], (data_view,  MousePressLeftUp):[Main::on_select_item(SELF)] )]
     finished_ui: FinishedList,
 
     #[nwg_partial(parent: runing_frame)]
@@ -82,6 +97,15 @@ impl Main {
         ));
     }
 
+    fn update_state_label(&self) {
+        let state_text: &str = match self.state.borrow().status() {
+            States::Finished => "Terminado",
+            States::Paused => "Pausado",
+            States::Processing => "Procesando",
+        };
+        self.state_label.set_text(state_text);
+    }
+
     fn update(&self, should_update: &[ShouldUpdate]) {
         let state = self.state.borrow();
         self.global_timer.set_text(&seconds_to_str(state.elapsed()));
@@ -90,6 +114,7 @@ impl Main {
             self.queue_ui.set_list(&Vec::from(state.get_queued()));
         }
         if should_update.contains(&ShouldUpdate::Finished) {
+            self.update_state_label();
             self.finished_ui.set_list(&Vec::from(state.get_finished()));
         }
         if should_update.contains(&ShouldUpdate::Blocked) {
@@ -110,6 +135,7 @@ impl Main {
                 let result = handle.join().unwrap();
                 if result == 0 {
                     self.close();
+                    return;
                 }
                 self.timer.start();
                 let processes = random_processes(result as i32, &mut rng);
@@ -117,14 +143,30 @@ impl Main {
                     let mut state = self.state.borrow_mut();
                     state.add_processes(&processes);
                     state.start();
+                    self.et_timer
+                        .set_text(&seconds_to_str(state.estimated())[..]);
                 }
                 self.queue_ui.setup();
                 self.finished_ui.setup();
                 self.blocked_ui.setup();
                 self.update(&[ShouldUpdate::Queue]);
+                self.update_state_label();
             }
             None => {}
         }
+    }
+
+    fn on_select_item(&self) {
+        let index = match self.finished_ui.data_view.selected_item() {
+            Some(val) => val as i32,
+            None => -1,
+        };
+        if index < 0 {
+            return;
+        }
+        let finished = Vec::from(self.state.borrow().get_finished());
+        let proc = finished[index as usize].clone();
+        dialogs::DialogDetails::show_item(proc);
     }
 
     fn on_key_press(&self, key: &nwg::EventData) {
@@ -132,13 +174,17 @@ impl Main {
             nwg::keys::_P => {
                 self.timer.stop();
                 self.state.borrow_mut().pause();
+                self.update_state_label();
             }
             nwg::keys::_C => {
-                let mut state = self.state.borrow_mut();
-                if let States::Paused = state.status() {
-                    state.play();
-                    self.timer.start();
+                {
+                    let mut state = self.state.borrow_mut();
+                    if let States::Paused = state.status() {
+                        state.play();
+                        self.timer.start();
+                    }
                 }
+                self.update_state_label();
             }
             nwg::keys::_I => {
                 self.state.borrow_mut().interrupt();

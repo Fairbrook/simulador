@@ -110,8 +110,11 @@ impl StatefulProcess {
             state: State::Ready,
         }
     }
-    pub fn start(&mut self) {
+    pub fn start(&mut self, timestamp: u32) {
         self.state = State::Execution;
+        if self.times.service_seconds == 0{
+            self.times.attendent_seconds = timestamp;
+        }
     }
 
     pub fn interrupt(&mut self) {
