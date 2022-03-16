@@ -17,6 +17,7 @@ use std::{cell::RefCell, thread};
 pub struct Main {
     dialog_data: RefCell<Option<thread::JoinHandle<u32>>>,
     state: RefCell<State>,
+    rng: RefCell<ThreadRng>,
 
     #[nwg_control(size: (1500, 700), title: "Simulador de procesos", flags: "WINDOW|VISIBLE|RESIZABLE")]
     #[nwg_events( OnWindowClose: [Main::close], OnInit:[Main::open_dialog], OnKeyPress:[Main::on_key_press(SELF, EVT_DATA)] )]
@@ -92,9 +93,14 @@ impl Main {
     }
 
     fn open_dialog(&self) {
-        *self.dialog_data.borrow_mut() = Some(dialogs::DialogNumber::ask_number(
-            self.dialog_notice.sender(),
-        ));
+        *self.rng.borrow_mut() = thread_rng();
+        self.queue_ui.setup();
+        self.finished_ui.setup();
+        self.blocked_ui.setup();
+        self.timer.start();
+        // *self.dialog_data.borrow_mut() = Some(dialogs::DialogNumber::ask_number(
+        //     self.dialog_notice.sender(),
+        // ));
     }
 
     fn update_state_label(&self) {
@@ -119,6 +125,10 @@ impl Main {
         }
         if should_update.contains(&ShouldUpdate::Blocked) {
             self.blocked_ui.set_list(&Vec::from(state.get_blocked()));
+        }
+        if let States::Finished = state.status() {
+            dialogs::DialogBCP::show_item(self.state.borrow().get_all());
+            self.timer.stop();
         }
     }
 
@@ -193,6 +203,24 @@ impl Main {
             nwg::keys::_E => {
                 self.state.borrow_mut().error();
                 self.update(&[ShouldUpdate::Queue, ShouldUpdate::Finished]);
+            }
+            nwg::keys::_N => {
+                let processes = random_processes(1, &mut self.rng.borrow_mut());
+                {
+                    let mut state = self.state.borrow_mut();
+                    state.add_processes(&processes);
+                    state.start();
+                    self.et_timer
+                        .set_text(&seconds_to_str(state.estimated())[..]);
+                }
+                self.update(&[ShouldUpdate::Queue]);
+                self.update_state_label();
+            }
+            nwg::keys::_B => {
+                dialogs::DialogBCP::show_item(self.state.borrow().get_all());
+                self.timer.stop();
+                self.state.borrow_mut().pause();
+                self.update_state_label();
             }
             _ => {}
         };

@@ -1,4 +1,7 @@
-use crate::types::{process::StatefulProcess, seconds_to_str};
+use crate::types::{
+    process::{self, StatefulProcess},
+    seconds_to_str,
+};
 use nwd::NwgUi;
 use nwg::NativeUi;
 use std::{cell::RefCell, thread};
@@ -61,7 +64,7 @@ impl DialogNumber {
 #[derive(Default, NwgUi)]
 pub struct DialogDetails {
     // process: StatefulProcess,
-    #[nwg_control(size: (300, 220), title: "Numero de procesos", flags: "WINDOW|VISIBLE")]
+    #[nwg_control(size: (300, 220), title: "Información del proceso", flags: "WINDOW|VISIBLE")]
     #[nwg_events( OnWindowClose: [DialogDetails::close] )]
     window: nwg::Window,
 
@@ -144,6 +147,181 @@ impl DialogDetails {
             _dialog
                 .service_time
                 .set_text(&seconds_to_str(process.times.service_seconds)[..]);
+            nwg::dispatch_thread_events();
+        });
+    }
+}
+
+#[derive(Default, NwgUi)]
+pub struct DialogBCP {
+    // process: StatefulProcess,
+    labels: RefCell<Vec<nwg::Label>>,
+    grid: RefCell<nwg::GridLayout>,
+    #[nwg_control(size: (300, 220), title: "Numero de procesos", flags: "WINDOW|VISIBLE")]
+    #[nwg_events( OnWindowClose: [DialogBCP::close] )]
+    pub window: nwg::Window,
+
+    #[nwg_layout(parent: window)]
+    layout: nwg::GridLayout,
+}
+
+impl DialogBCP {
+    fn close(&self) {
+        nwg::stop_thread_dispatch();
+    }
+    pub fn show_item(processes: Vec<StatefulProcess>) {
+        thread::spawn(move || {
+            let dialog =
+                DialogBCP::build_ui(Default::default()).expect("Error al crear el díalogo");
+            dialog.window.set_size(800, 22 * 5 * processes.len() as u32);
+            let mut labels = Vec::<nwg::Label>::new();
+            nwg::GridLayout::builder()
+                .parent(&dialog.window)
+                .max_row(Some(5 * processes.len() as u32))
+                .build(&dialog.grid.borrow())
+                .expect("Error al crear laylout");
+            let mut index = 0;
+            for process in &processes {
+                let mut label: nwg::Label = Default::default();
+                let state = String::from("PID: ")
+                    + &process.process.pid
+                    + &String::from(" | ")
+                    + match process.state {
+                        process::State::Blocked => "Bloqueado",
+                        process::State::Error => "Error",
+                        process::State::Finished => "Completado",
+                        process::State::Ready => "Listo",
+                        process::State::Execution => "Ejecución",
+                    };
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&state)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(0, index, &label);
+                index += 1;
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let mut text =
+                    String::from("  Operacion: ") + &process.process.operation.to_string();
+                if let process::State::Finished = process.state {
+                    text += &(String::from(" = ") + &process.result.to_string());
+                }
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(0, index, &label);
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de llegada: ")
+                    + &seconds_to_str(process.times.arrive_time);
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(1, index, &label);
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de finalizacion: ")
+                    + &match process.state {
+                        process::State::Error => seconds_to_str(process.times.finished_time),
+                        process::State::Finished => seconds_to_str(process.times.finished_time),
+                        _ => String::from("N/A"),
+                    };
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(2, index, &label);
+                index += 1;
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de retorno: ")
+                    + &match process.state {
+                        process::State::Error => seconds_to_str(process.times.ret()),
+                        process::State::Finished => seconds_to_str(process.times.ret()),
+                        _ => String::from("N/A"),
+                    };
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(0, index, &label);
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de espera: ")
+                    + &seconds_to_str(process.times.waiting_seconds);
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(1, index, &label);
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de servicio: ")
+                    + &seconds_to_str(process.times.service_seconds);
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(2, index, &label);
+                index += 1;
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text =
+                    String::from("  Tiempo restante: ") + &seconds_to_str(process.remaining());
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(0, index, &label);
+                labels.push(label);
+
+                let mut label: nwg::Label = Default::default();
+                let text = String::from("  Tiempo de respuesta: ")
+                    + &match process.times.service_seconds {
+                        0 => String::from("N/A"),
+                        _ => seconds_to_str(process.times.attendent_seconds),
+                    };
+                nwg::Label::builder()
+                    .parent(&dialog.window)
+                    .text(&text)
+                    .build(&mut label)
+                    .expect("Error al crear label");
+                (*dialog.grid.borrow()).add_child(1, index, &label);
+                labels.push(label);
+
+                if let process::State::Blocked = process.state {
+                    let mut label: nwg::Label = Default::default();
+                    let time =
+                        10 - (process.times.blocked_seconds - (process.times.blocked_seconds / 10));
+                    nwg::Label::builder()
+                        .parent(&dialog.window)
+                        .text(&(String::from(" Restante bloqueado: ") + &seconds_to_str(time)))
+                        .build(&mut label)
+                        .expect("Error al crear label");
+                    (*dialog.grid.borrow()).add_child(2, index, &label);
+                    labels.push(label);
+                }
+
+                index += 2;
+            }
+            *dialog.labels.borrow_mut() = labels;
             nwg::dispatch_thread_events();
         });
     }

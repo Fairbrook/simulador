@@ -41,13 +41,17 @@ impl Default for State {
 impl State {
     pub fn add_process(&mut self, process: Process) -> u32 {
         self.et += process.et;
-        self.processes.push(StatefulProcess::from(process));
+        let mut stateful = StatefulProcess::from(process);
+        stateful.times.arrive_time = self.elapsed;
+        self.processes.push(stateful);
         self.len += 1;
         self.len
     }
     pub fn add_processes(&mut self, process: &Vec<Process>) {
         for proc in process {
-            self.add_process(proc.clone());
+            let mut proc = proc.clone();
+            proc.pid = String::from(self.len.to_string());
+            self.add_process(proc);
         }
     }
     pub fn start(&mut self) {
@@ -118,6 +122,9 @@ impl State {
             return &self.processes[self.active + 1..];
         }
         return &[];
+    }
+    pub fn get_all(&self) -> Vec<StatefulProcess> {
+        [self.processes.clone(), self.blocked.clone()].concat()
     }
     pub fn get_blocked(&self) -> &[StatefulProcess] {
         &self.blocked[..]

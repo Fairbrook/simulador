@@ -60,6 +60,7 @@ pub struct Process {
 
 #[derive(Clone, Default)]
 pub struct Times {
+    pub arrive_time: u32,
     pub start_time: u32,
     pub finished_time: u32,
     pub attendent_seconds: u32,
@@ -70,7 +71,7 @@ pub struct Times {
 
 impl Times {
     pub fn ret(&self) -> u32 {
-        self.finished_time - self.start_time
+        self.finished_time - self.arrive_time
     }
 }
 
@@ -84,7 +85,7 @@ pub struct StatefulProcess {
 
 impl StatefulProcess {
     pub fn current_time(&self) -> u32 {
-        self.times.start_time
+        self.times.arrive_time
             + self.times.attendent_seconds
             + self.times.service_seconds
             + self.times.blocked_seconds
@@ -100,6 +101,12 @@ impl StatefulProcess {
         self.times.finished_time = self.current_time();
         self.process.et - self.times.service_seconds
     }
+    pub fn remaining(&self) -> u32 {
+        if let State::Error = self.state {
+            return 0;
+        }
+        self.process.et - self.times.service_seconds
+    }
     pub fn from(process: Process) -> StatefulProcess {
         StatefulProcess {
             process: process.clone(),
@@ -112,8 +119,8 @@ impl StatefulProcess {
     }
     pub fn start(&mut self, timestamp: u32) {
         self.state = State::Execution;
-        if self.times.service_seconds == 0{
-            self.times.attendent_seconds = timestamp;
+        if self.times.service_seconds == 0 {
+            self.times.attendent_seconds = timestamp - self.times.arrive_time;
         }
     }
 
